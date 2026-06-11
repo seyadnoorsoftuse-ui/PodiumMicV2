@@ -1,0 +1,49 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract project files from guide
+        run: |
+          python3 << 'PYEOF'
+          import re, os
+          text = open('PodiumMic-All-Files-Guide.md', encoding='utf-8').read()
+          blocks = re.findall(r'## File \d+.*?```\n(.*?)\n```.*?~~~~\n(.*?)\n~~~~', text, re.S)
+          print(f"Found {len(blocks)} files")
+          for path, content in blocks:
+              path = path.strip()
+              if os.path.dirname(path):
+                  os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, 'w', encoding='utf-8') as f:
+                  f.write(content + '\n')
+              print('wrote', path)
+          PYEOF
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build Debug APK
+        run: gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PodiumMic-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
